@@ -1,0 +1,8 @@
+flask 
+flask_sqlalchemy 
+flask_login 
+werkzeug 
+opencv-python 
+face_recognition 
+dlib 
+numpy 
