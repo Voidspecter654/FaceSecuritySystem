@@ -124,7 +124,7 @@ with open("recognizer/encodings.pkl", "rb") as f:
     data = pickle.load(f)
 
 # Initialize video stream
-camera = cv2.VideoCapture(0, cv2.CAP_MSMF)
+camera = cv2.VideoCapture(1, cv2.CAP_MSMF)
 
 def generate_frames():
     print("[INFO] Starting video stream with AI detection...")
