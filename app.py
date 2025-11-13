@@ -132,16 +132,34 @@ def generate_frames():
 
     while True:
         success, frame = camera.read()
-        if not success:
-            break
+        if not success or frame is None:
+            # Skip if frame not captured correctly
+            continue
+
+        # Ensure the frame is 8-bit and has 3 channels
+        if frame.dtype != np.uint8:
+            frame = frame.astype(np.uint8)
+
+        if len(frame.shape) == 2:
+            # Grayscale to RGB
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
+        elif frame.shape[2] == 3:
+            # BGR to RGB
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        else:
+            # Unexpected channel count
+            continue
 
         # Resize frame for faster processing
-        small_frame = cv2.resize(frame, (0, 0), fx=0.5, fy=0.5)
-        rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
+        small_frame = cv2.resize(rgb_frame, (0, 0), fx=0.5, fy=0.5)
 
-        # Detect faces and get encodings
-        face_locations = face_recognition.face_locations(rgb_small_frame)
-        face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
+        # Detect faces
+        try:
+            face_locations = face_recognition.face_locations(small_frame)
+            face_encodings = face_recognition.face_encodings(small_frame, face_locations)
+        except Exception as e:
+            print(f"[WARNING] Face detection skipped: {e}")
+            continue
 
         direction_text = ""  # Reset per frame
         frame_center = frame.shape[1] // 2  # Middle X of frame
@@ -154,18 +172,16 @@ def generate_frames():
                 match_index = matches.index(True)
                 name = known_names[match_index]
 
-            # Scale back up face locations since we resized frame
+            # Scale back up face locations
             top *= 2
             right *= 2
             bottom *= 2
             left *= 2
 
-            # Bounding box color (red for known, green for unknown)
             color = (0, 0, 255) if name != "Unknown" else (0, 255, 0)
             cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
             cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
 
-            # Only calculate direction for UNKNOWN faces
             if name == "Unknown":
                 face_center_x = (left + right) // 2
                 if face_center_x < frame_center - 80:
@@ -175,15 +191,13 @@ def generate_frames():
                 else:
                     direction_text = "MOVE FORWARD ↑"
 
-        # Show direction on frame
         if direction_text:
             cv2.putText(frame, direction_text, (50, 50), cv2.FONT_HERSHEY_DUPLEX, 1, (0, 255, 255), 3)
 
-        # Encode and yield frame
         ret, buffer = cv2.imencode('.jpg', frame)
-        frame = buffer.tobytes()
+        frame_bytes = buffer.tobytes()
         yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
 
 @app.route('/video_feed')
 def video_feed():
